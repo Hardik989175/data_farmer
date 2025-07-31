@@ -1,3 +1,4 @@
+# Import necessary libraries
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,11 +6,15 @@ import seaborn as sns
 import os
 from xgboost import XGBRegressor
 
+# Set the name of the target variable to be predicted
 TARGET = 'Target_Variable/Total Income'
 
 def setup_directories():
-    """Creates all necessary directories for saving plots."""
-    print("  - Setting up plot directories...")
+    """
+    Creates all the necessary directory folders to save the generated plots
+    corresponding to each stage of the data science workflow.
+    """
+    print("Setting up plot directories")
     os.makedirs('plots/01_raw_data_analysis', exist_ok=True)
     os.makedirs('plots/02_data_cleaning', exist_ok=True)
     os.makedirs('plots/03_feature_engineering', exist_ok=True)
@@ -18,10 +23,17 @@ def setup_directories():
     os.makedirs('plots/06_final_results', exist_ok=True)
 
 def generate_raw_data_plots(raw_train_df):
-    """Generates and saves plots for initial raw data analysis."""
-    print("  - Generating plots for raw data analysis...")
+    """
+    Generates and saves visualizations for raw (uncleaned) training data:
+    - Distribution of the target variable
+    - Histograms of numerical features
+    - Heatmap showing missing values
+    - Correlation matrix among numerical variables
+    """
+    print("Generating plots for raw data analysis")
     
-    # Target Variable Distribution
+    # Plot and save the distribution of the target variable before transformation
+    
     plt.figure(figsize=(10, 6))
     sns.histplot(raw_train_df[TARGET], kde=True)
     plt.title('Target Variable Distribution (Before Transformation)')
@@ -30,7 +42,8 @@ def generate_raw_data_plots(raw_train_df):
     plt.savefig('plots/01_raw_data_analysis/target_variable_distribution.png')
     plt.close()
 
-    # Numerical Features Distribution
+    # Plot distributions for all numerical columns (except the target variable)
+    
     numerical_features = raw_train_df.select_dtypes(include=np.number).columns.tolist()
     numerical_features.remove(TARGET)
     raw_train_df[numerical_features].hist(bins=20, figsize=(20, 15))
@@ -39,14 +52,16 @@ def generate_raw_data_plots(raw_train_df):
     plt.savefig('plots/01_raw_data_analysis/numerical_features_distribution.png')
     plt.close()
 
-    # Missing Values Heatmap
+    # Visualize the pattern of missing data across the dataset
+    
     plt.figure(figsize=(12, 8))
     sns.heatmap(raw_train_df.isnull(), cbar=False, cmap='viridis')
     plt.title('Missing Values Heatmap')
     plt.savefig('plots/01_raw_data_analysis/missing_values_heatmap.png')
     plt.close()
 
-    # Correlation Matrix
+    # Display a correlation heatmap to identify how numerical features relate to each other
+    
     corr_df = raw_train_df.select_dtypes(include=np.number)
     plt.figure(figsize=(20, 15))
     sns.heatmap(corr_df.corr(), annot=False, cmap='coolwarm')
@@ -55,13 +70,20 @@ def generate_raw_data_plots(raw_train_df):
     plt.close()
 
 def generate_cleaning_plots(raw_train_df):
-    """Generates plots to visualize the effect of data cleaning."""
-    print("  - Generating plots for data cleaning...")
+    """
+    Visualizes the effect of data cleaning, specifically:
+    - Cleans a temperature column that originally contains string values
+    - Plots temperature before and after cleaning (as numeric values)
+    """
+    print("Generating plots for data cleaning")
     temp_col_original = 'K022-Ambient temperature (min & max)'
+    
     if temp_col_original in raw_train_df.columns:
+        # Extract the min temperature from a string like "24/37"
         df_temp_before = raw_train_df[[temp_col_original]].copy().dropna()
         df_temp_before['min_temp_before'] = pd.to_numeric(df_temp_before[temp_col_original].str.split('/', expand=True)[0], errors='coerce')
         
+        # Plot min temperature before and after conversion
         fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
         sns.histplot(df_temp_before['min_temp_before'], ax=axes[0], kde=True, bins=20)
         axes[0].set_title('Before: Min Temperature (from string)')
@@ -73,11 +95,17 @@ def generate_cleaning_plots(raw_train_df):
         plt.close()
 
 def generate_feature_engineering_plots(raw_train_df):
-    """Visualizes the relationship of an engineered feature with the target."""
-    print("  - Generating plots for feature engineering...")
+    """
+    Visualizes the impact of an engineered feature (interaction term)
+    - Multiplies land area with population density to create a new feature
+    - Plots how this engineered feature relates to income
+    """
+    print("Generating plots for feature engineering")
     if 'Total_Land_For_Agriculture' in raw_train_df.columns and 'L009-Population density' in raw_train_df.columns:
         df_fe = raw_train_df.copy()
         df_fe['land_x_density'] = df_fe['Total_Land_For_Agriculture'] * df_fe['L009-Population density']
+        
+        # Scatterplot to observe trend between new feature and target
         plt.figure(figsize=(10, 6))
         sns.scatterplot(data=df_fe, x='land_x_density', y=TARGET, alpha=0.5)
         plt.title('Engineered Feature: Land Area x Population Density vs. Income')
@@ -87,9 +115,14 @@ def generate_feature_engineering_plots(raw_train_df):
         plt.close()
 
 def generate_outlier_plots(raw_train_df):
-    """Demonstrates the effect of outlier capping."""
-    print("  - Generating plots for outlier handling...")
+    """
+    Demonstrates the effect of outlier handling (capping/extreme value clipping)
+    - Caps the 'Total_Land_For_Agriculture' feature at 1st and 99th percentiles
+    - Shows before and after boxplots
+    """
+    print("Generating plots for outlier handling")
     feature_to_cap = 'Total_Land_For_Agriculture'
+    
     if feature_to_cap in raw_train_df.columns:
         q1 = raw_train_df[feature_to_cap].quantile(0.01)
         q3 = raw_train_df[feature_to_cap].quantile(0.99)
@@ -98,6 +131,7 @@ def generate_outlier_plots(raw_train_df):
         sns.boxplot(y=raw_train_df[feature_to_cap], ax=axes[0])
         axes[0].set_title(f'Before Capping: {feature_to_cap}')
         
+        # Clip the outliers
         df_capped = raw_train_df.copy()
         df_capped[feature_to_cap] = np.clip(df_capped[feature_to_cap], q1, q3)
         
@@ -108,9 +142,13 @@ def generate_outlier_plots(raw_train_df):
         plt.close()
 
 def generate_transformation_plots(raw_train_df):
-    """Visualizes the effect of log-transforming the target variable."""
-    print("  - Generating plots for target transformation...")
-    y_train_log = np.log1p(raw_train_df[TARGET])
+    """
+    Plots the impact of log transformation on the target variable:
+    - Helps stabilize variance and normalize distribution for regression
+    """
+    print("Generating plots for target transformation")
+    y_train_log = np.log1p(raw_train_df[TARGET])  # log(1 + y) to handle 0s safely
+
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     sns.histplot(raw_train_df[TARGET], kde=True, ax=axes[0], bins=30)
     axes[0].set_title('Original Target Distribution')
@@ -121,14 +159,28 @@ def generate_transformation_plots(raw_train_df):
     plt.close()
 
 def generate_final_results_plots(final_model, X_train, y_train):
-    """Generates plots to evaluate the final model's performance on training data."""
-    print("  - Generating final results plots...")
+    """
+    Evaluates final model by visualizing:
+    - Feature importance (top 20)
+    - Actual vs. Predicted values on training data
+    """
+    print("Generating final results plots")
     
-    # Feature Importance Plot
-    print("    - Generating Feature Importance plot...")
-    importance_model = XGBRegressor(n_estimators=1500, learning_rate=0.05, max_depth=8, subsample=0.8, colsample_bytree=0.8, gamma=1, random_state=42)
+    # --- Feature Importance Plot ---
+    print("Generating Feature Importance plot")
+    importance_model = XGBRegressor(
+        n_estimators=1500, learning_rate=0.05, max_depth=8,
+        subsample=0.8, colsample_bytree=0.8, gamma=1, random_state=42
+    )
     importance_model.fit(X_train, y_train)
-    feature_importances = pd.DataFrame({'feature': X_train.columns, 'importance': importance_model.feature_importances_}).sort_values('importance', ascending=False)
+    
+    # Get top features based on importance
+    feature_importances = pd.DataFrame({
+        'feature': X_train.columns,
+        'importance': importance_model.feature_importances_
+    }).sort_values('importance', ascending=False)
+    
+    # Bar plot of top 20 features
     plt.figure(figsize=(12, 8))
     sns.barplot(data=feature_importances.head(20), x='importance', y='feature')
     plt.title('Top 20 Most Important Features in Final Model')
@@ -136,19 +188,24 @@ def generate_final_results_plots(final_model, X_train, y_train):
     plt.savefig('plots/06_final_results/feature_importance.png')
     plt.close()
 
-    # Actual vs. Predicted Plot
-    print("    - Generating Actual vs. Predicted plot...")
+    # Actual vs Predicted Plot
+    print("Generating Actual vs. Predicted plot")
     train_preds_log = final_model.predict(X_train)
-    train_preds_original = np.expm1(train_preds_log)
+    train_preds_original = np.expm1(train_preds_log)  # Convert back from log space
     y_train_original = np.expm1(y_train)
+    
     results_df = pd.DataFrame({'Actual': y_train_original, 'Predicted': train_preds_original})
     
     plt.figure(figsize=(10, 10))
     sns.scatterplot(data=results_df, x='Actual', y='Predicted', alpha=0.5)
-    plt.plot([results_df['Actual'].min(), results_df['Actual'].max()], [results_df['Actual'].min(), results_df['Actual'].max()], '--r', linewidth=2)
+    plt.plot(
+        [results_df['Actual'].min(), results_df['Actual'].max()],
+        [results_df['Actual'].min(), results_df['Actual'].max()],
+        '--r', linewidth=2
+    )
     plt.title('Actual vs. Predicted Income on Full Training Set')
     plt.xlabel('Actual Income')
     plt.ylabel('Predicted Income')
     plt.tight_layout()
     plt.savefig('plots/06_final_results/actual_vs_predicted.png')
-    plt.close() 
+    plt.close()
